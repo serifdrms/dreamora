@@ -1,5 +1,7 @@
 package com.isteserif.dreamora.ui.screens
 
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -10,14 +12,20 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.isteserif.dreamora.ui.viewmodel.DreamUiState
 import com.isteserif.dreamora.ui.viewmodel.DreamViewModel
+import kotlin.math.sin
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -25,21 +33,14 @@ fun DreamScreen(
     onHistoryClick: () -> Unit = {},
     viewModel: DreamViewModel = viewModel()
 ) {
-
-    // 1. ViewModel'deki durumu anlık olarak dinliyoruz
     val uiState by viewModel.uiState.collectAsState()
-
-    // 2. Kullanıcının klavyeden girdiği rüya metnini hafızada tutuyoruz
     var dreamText by remember { mutableStateOf("") }
-
-    // Klavye odağını kontrol etmek için
     val focusManager = LocalFocusManager.current
 
-    // Scaffold, Android ekranlarında üst bar (TopBar) ve alt bar gibi yapıları kolayca kurmamızı sağlar
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Dreamora") },
+                title = { Text("✦ Dreamora") },
                 actions = {
                     TextButton(onClick = onHistoryClick) {
                         Text("Geçmişim")
@@ -47,28 +48,30 @@ fun DreamScreen(
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.primary,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
             )
         }
     ) { paddingValues ->
-        // Ekranın içindeki elemanları alt alta (Column) diziyoruz
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
                 .padding(16.dp)
-                .verticalScroll(rememberScrollState()) // Ekran kaydırılabilir olsun
+                .verticalScroll(rememberScrollState())
                 .pointerInput(Unit) {
-                    detectTapGestures(onTap = {
-                        focusManager.clearFocus() // Ekranın boş yerine tıklanınca klavyeyi kapat
-                    })
+                    detectTapGestures(onTap = { focusManager.clearFocus() })
                 },
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp) // Elemanlar arasına 16dp boşluk
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // Ay ikonu
+            Text(
+                text = "🌙",
+                style = MaterialTheme.typography.displayMedium,
+                modifier = Modifier.padding(top = 8.dp)
+            )
 
-            // Rüya Giriş Alanı
             OutlinedTextField(
                 value = dreamText,
                 onValueChange = { dreamText = it },
@@ -78,58 +81,79 @@ fun DreamScreen(
                     .height(150.dp),
                 maxLines = 5,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(
-                    onDone = { focusManager.clearFocus() } // Enter/Tamam tuşuna basınca klavyeyi kapat
+                keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant,
+                    focusedLabelColor = MaterialTheme.colorScheme.primary,
+                    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             )
 
-            // Gönder Butonu (Eğer yükleniyorsa butona basılamasın)
             Button(
                 onClick = {
-                    focusManager.clearFocus() // Butona basınca klavyeyi kapat
+                    focusManager.clearFocus()
                     viewModel.analyzeUserDream(dreamText)
                 },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = uiState !is DreamUiState.Loading && dreamText.isNotBlank()
+                enabled = uiState !is DreamUiState.Loading && dreamText.isNotBlank(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary
+                )
             ) {
-                Text("Rüyamı Yorumla")
+                Text("✨ Rüyamı Yorumla")
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // 3. EKRANIN DURUMUNA GÖRE (STATE) FARKLI GÖRSELLER ÇIKARTIYORUZ
             when (val currentState = uiState) {
-                // YENİ:
                 is DreamUiState.Idle -> {
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier.padding(horizontal = 8.dp)
+                    )
+
                     val quotes = listOf(
-                        "\"Rüyalar, bilinçdışının kraliyet yoludur.\" — Sigmund Freud",
-                        "\"Rüya görmek cesarettir.\" — Anaïs Nin",
-                        "\"Rüyalar gerçeğin gizli kapılarıdır.\" — Carl Jung",
-                        "\"En derin düşünceler rüyalarda gizlidir.\" — Aristo",
-                        "\"Rüyalar, ruhun sessiz çığlıklarıdır.\" — Victor Hugo",
-                        "\"Gece rüya gören, gündüz güneşi fark eder.\" — William Blake",
-                        "\"Rüyalarınızı hatırlayın, çünkü onlar yolunuzu gösterir.\" — Carl Jung",
-                        "\"Rüya görmeden uyumak, yıldızsız gökyüzü gibidir.\" — Malcolm de Chazal"
+                        "\"Rüyalar, bilinçdışının kraliyet yoludur.\"\n— Sigmund Freud",
+                        "\"Rüya görmek cesarettir.\"\n— Anaïs Nin",
+                        "\"Rüyalar gerçeğin gizli kapılarıdır.\"\n— Carl Jung",
+                        "\"En derin düşünceler rüyalarda gizlidir.\"\n— Aristo",
+                        "\"Rüyalar, ruhun sessiz çığlıklarıdır.\"\n— Victor Hugo",
+                        "\"Gece rüya gören, gündüz güneşi fark eder.\"\n— William Blake",
+                        "\"Rüyalarınızı hatırlayın, onlar yolunuzu gösterir.\"\n— Carl Jung",
+                        "\"Rüya görmeden uyumak, yıldızsız gökyüzü gibidir.\"\n— Malcolm de Chazal"
                     )
                     val randomQuote = remember { quotes.random() }
 
                     Text(
                         text = randomQuote,
                         textAlign = TextAlign.Center,
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontStyle = FontStyle.Italic
+                        ),
                         color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    // Dalga animasyonu
+                    WaveAnimation(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(60.dp)
                     )
                 }
 
                 is DreamUiState.Loading -> {
-                    CircularProgressIndicator() // Dönen yükleme animasyonu
-                    Text("Evrenin mesajları dinleniyor...")
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                    Text(
+                        "Evrenin mesajları dinleniyor...",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
 
                 is DreamUiState.Success -> {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer
+                        )
                     ) {
                         Text(
                             text = currentState.analysis,
@@ -137,8 +161,6 @@ fun DreamScreen(
                             style = MaterialTheme.typography.bodyLarge
                         )
                     }
-
-                    // Yeni Rüya Butonu
                     TextButton(onClick = {
                         dreamText = ""
                         viewModel.resetState()
@@ -157,4 +179,110 @@ fun DreamScreen(
             }
         }
     }
+}
+
+@Composable
+fun WaveAnimation(modifier: Modifier = Modifier) {
+    val infiniteTransition = rememberInfiniteTransition(label = "wave")
+
+    val wave1Offset by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = (2 * Math.PI).toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(5000, easing = LinearEasing)
+        ),
+        label = "wave1"
+    )
+    val wave2Offset by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = (2 * Math.PI).toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(6000, easing = LinearEasing)
+        ),
+        label = "wave2"
+    )
+    val wave3Offset by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = (2 * Math.PI).toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(7000, easing = LinearEasing)
+        ),
+        label = "wave3"
+    )
+
+    val sparkleAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.2f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "sparkle"
+    )
+
+    Canvas(modifier = modifier) {
+        drawWave(
+            offset = wave1Offset,
+            color = Color(0xFF3D2070),
+            amplitude = 10f,
+            yBase = size.height * 0.5f,
+            alpha = 0.5f
+        )
+        drawWave(
+            offset = wave2Offset,
+            color = Color(0xFF2A1650),
+            amplitude = 8f,
+            yBase = size.height * 0.65f,
+            alpha = 0.55f
+        )
+        drawWave(
+            offset = wave3Offset,
+            color = Color(0xFF1A0D38),
+            amplitude = 6f,
+            yBase = size.height * 0.78f,
+            alpha = 0.7f
+        )
+
+        // Parlayan noktalar
+        val sparklePositions = listOf(
+            Offset(size.width * 0.15f, size.height * 0.35f),
+            Offset(size.width * 0.42f, size.height * 0.25f),
+            Offset(size.width * 0.75f, size.height * 0.4f),
+            Offset(size.width * 0.88f, size.height * 0.2f),
+        )
+        sparklePositions.forEachIndexed { i, pos ->
+            drawCircle(
+                color = Color(0xFFC8A0FF),
+                radius = 2.5f,
+                center = pos,
+                alpha = if (i % 2 == 0) sparkleAlpha else 1f - sparkleAlpha
+            )
+        }
+    }
+}
+
+fun DrawScope.drawWave(
+    offset: Float,
+    color: Color,
+    amplitude: Float,
+    yBase: Float,
+    alpha: Float
+) {
+    val path = Path()
+    val width = size.width
+    val height = size.height
+    path.moveTo(0f, height)
+
+    var x = 0f
+    while (x <= width) {
+        val y = yBase + amplitude * sin(offset + (x / width) * 2 * Math.PI).toFloat()
+        if (x == 0f) path.moveTo(x, y) else path.lineTo(x, y)
+        x += 4f
+    }
+
+    path.lineTo(width, height)
+    path.lineTo(0f, height)
+    path.close()
+
+    drawPath(path = path, color = color, alpha = alpha)
 }
