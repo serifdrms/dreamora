@@ -21,7 +21,10 @@ import com.isteserif.dreamora.ui.viewmodel.DreamViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DreamScreen(viewModel: DreamViewModel = viewModel()) {
+fun DreamScreen(
+    onHistoryClick: () -> Unit = {},
+    viewModel: DreamViewModel = viewModel()
+) {
 
     // 1. ViewModel'deki durumu anlık olarak dinliyoruz
     val uiState by viewModel.uiState.collectAsState()
@@ -37,6 +40,11 @@ fun DreamScreen(viewModel: DreamViewModel = viewModel()) {
         topBar = {
             TopAppBar(
                 title = { Text("Dreamora") },
+                actions = {
+                    TextButton(onClick = onHistoryClick) {
+                        Text("Geçmişim")
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     titleContentColor = MaterialTheme.colorScheme.primary,
@@ -91,10 +99,24 @@ fun DreamScreen(viewModel: DreamViewModel = viewModel()) {
 
             // 3. EKRANIN DURUMUNA GÖRE (STATE) FARKLI GÖRSELLER ÇIKARTIYORUZ
             when (val currentState = uiState) {
+                // YENİ:
                 is DreamUiState.Idle -> {
+                    val quotes = listOf(
+                        "\"Rüyalar, bilinçdışının kraliyet yoludur.\" — Sigmund Freud",
+                        "\"Rüya görmek cesarettir.\" — Anaïs Nin",
+                        "\"Rüyalar gerçeğin gizli kapılarıdır.\" — Carl Jung",
+                        "\"En derin düşünceler rüyalarda gizlidir.\" — Aristo",
+                        "\"Rüyalar, ruhun sessiz çığlıklarıdır.\" — Victor Hugo",
+                        "\"Gece rüya gören, gündüz güneşi fark eder.\" — William Blake",
+                        "\"Rüyalarınızı hatırlayın, çünkü onlar yolunuzu gösterir.\" — Carl Jung",
+                        "\"Rüya görmeden uyumak, yıldızsız gökyüzü gibidir.\" — Malcolm de Chazal"
+                    )
+                    val randomQuote = remember { quotes.random() }
+
                     Text(
-                        text = "Yapay zeka rüyanızın ardındaki gizemleri çözmek için bekliyor.",
+                        text = randomQuote,
                         textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }

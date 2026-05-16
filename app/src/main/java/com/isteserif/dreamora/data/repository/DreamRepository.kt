@@ -20,7 +20,7 @@ class DreamRepository {
         return withContext(Dispatchers.IO) {
             try {
                 // 1. Önce kullanıcının düz metnini ve Yapay Zeka kişiliğini API'nin istediği formata (GeminiRequest) çeviriyoruz
-                val prompt = "Sen gizemli, bilge ve edebi konuşan bir rüya tabircisisin. Kullanıcının sana anlattığı şu rüyayı mistik bir dille, detaylıca analiz et: $dreamText"
+                val prompt = "Sen modern, net ve profesyonel bir rüya tabircisisin. Kullanıcının rüyasını mistik edebiyata girmeden, sembollerin psikolojik ve geleneksel anlamlarını doğrudan, kısa ve öz bir şekilde yorumla: $dreamText"
 
                 val request = GeminiRequest(
                     contents = listOf(
