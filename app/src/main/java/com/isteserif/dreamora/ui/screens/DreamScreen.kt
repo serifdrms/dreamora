@@ -1,5 +1,11 @@
 package com.isteserif.dreamora.ui.screens
 
+import android.app.Activity
+import android.content.Intent
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -8,6 +14,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,6 +25,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.input.ImeAction
@@ -36,6 +45,33 @@ fun DreamScreen(
     val uiState by viewModel.uiState.collectAsState()
     var dreamText by remember { mutableStateOf("") }
     val focusManager = LocalFocusManager.current
+    val context = LocalContext.current
+
+    val speechLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val spokenText = result.data
+                ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+                ?.firstOrNull() ?: ""
+            if (spokenText.isNotBlank()) {
+                dreamText = if (dreamText.isBlank()) spokenText
+                else "$dreamText $spokenText"
+            }
+        }
+    }
+
+    fun startSpeechRecognition() {
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "tr-TR")
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "tr-TR")
+            putExtra("android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES", arrayOf("en-US"))
+            putExtra(RecognizerIntent.EXTRA_PROMPT, "Rüyanızı anlatın...")
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+        }
+        speechLauncher.launch(intent)
+    }
 
     Scaffold(
         topBar = {
@@ -43,7 +79,7 @@ fun DreamScreen(
                 title = { Text("✦ Dreamora") },
                 actions = {
                     TextButton(onClick = onHistoryClick) {
-                        Text("Geçmişim Rüyalarım")
+                        Text("Geçmiş Rüyalarım")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -65,7 +101,6 @@ fun DreamScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Ay + yıldız animasyonu
             MoonWithStars()
 
             OutlinedTextField(
@@ -86,23 +121,49 @@ fun DreamScreen(
                 )
             )
 
-            Button(
-                onClick = {
-                    focusManager.clearFocus()
-                    viewModel.analyzeUserDream(dreamText)
-                },
+            // Yorum butonu + mikrofon yan yana
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                enabled = uiState !is DreamUiState.Loading && dreamText.isNotBlank(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary
-                )
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("✨ Rüyamı Yorumla")
+                Button(
+                    onClick = {
+                        focusManager.clearFocus()
+                        viewModel.analyzeUserDream(dreamText)
+                    },
+                    modifier = Modifier.weight(1f),
+                    enabled = uiState !is DreamUiState.Loading && dreamText.isNotBlank(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary
+                    )
+                ) {
+                    Text("✨ Rüyamı Yorumla")
+                }
+
+                Button(
+                    onClick = {
+                        focusManager.clearFocus()
+                        if (SpeechRecognizer.isRecognitionAvailable(context)) {
+                            startSpeechRecognition()
+                        }
+                    },
+                    modifier = Modifier.size(48.dp),
+                    contentPadding = PaddingValues(0.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Mic,
+                        contentDescription = "Sesli yaz",
+                        tint = MaterialTheme.colorScheme.onPrimary
+                    )
+                }
             }
 
             when (val currentState = uiState) {
                 is DreamUiState.Idle -> {
-                    // Boşluk — söz aşağıya inssin
                     Spacer(modifier = Modifier.height(24.dp))
 
                     HorizontalDivider(
@@ -153,7 +214,7 @@ fun DreamScreen(
                 is DreamUiState.Loading -> {
                     CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                     Text(
-                        "Evrenin mesajları dinleniyor...",
+                        "Rüyanız İnceleniyor...",
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -181,7 +242,7 @@ fun DreamScreen(
 
                 is DreamUiState.Error -> {
                     Text(
-                        text = "Bir Hata Oluştu:\n${currentState.message}",
+                        text = "Bir Hata Oluştu:\nTekrar Deneyin",
                         color = MaterialTheme.colorScheme.error,
                         textAlign = TextAlign.Center
                     )
@@ -195,7 +256,6 @@ fun DreamScreen(
 fun MoonWithStars() {
     val infiniteTransition = rememberInfiniteTransition(label = "stars")
 
-    // Her yıldız için ayrı alpha animasyonu
     val alphas = (0..11).map { i ->
         infiniteTransition.animateFloat(
             initialValue = 0.15f,
