@@ -2,6 +2,7 @@ package com.isteserif.dreamora
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.*
@@ -19,6 +20,16 @@ class MainActivity : ComponentActivity() {
             DreamoraTheme {
                 var showHistory by remember { mutableStateOf(false) }
                 var selectedDream by remember { mutableStateOf<Dream?>(null) }
+
+                // Detay ekranındayken geri → geçmiş ekranına
+                BackHandler(enabled = selectedDream != null) {
+                    selectedDream = null
+                }
+
+                // Geçmiş ekranındayken geri → ana ekrana
+                BackHandler(enabled = showHistory && selectedDream == null) {
+                    showHistory = false
+                }
 
                 when {
                     selectedDream != null -> {
